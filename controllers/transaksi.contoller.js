@@ -31,8 +31,7 @@ export const createTransaksi = (req, res) => {
     });
   }
 
-  // Lanjut pakai nilai hasil konversi
-  kembalian = parsedBayar - parsedTotal;
+
 
   // Validasi kembalian
   if (bayar < total) {
