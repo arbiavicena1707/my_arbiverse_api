@@ -189,3 +189,71 @@ export const getTransaksiById = (req, res) => {
     });
   });
 };
+
+// 🔹 Resume transaksi untuk dashboard (admin)
+export const getTransaksiResume = (req, res) => {
+  const role = req.user?.role;
+  if (role !== "admin") {
+    return res.status(403).json({
+      status: 403,
+      message: "Hanya admin yang bisa melihat resume transaksi",
+    });
+  }
+
+  // Ambil total omzet, total modal, dan keuntungan
+  const sql = `
+    SELECT 
+      COUNT(DISTINCT t.id) AS total_transaksi,
+      SUM(t.total) AS total_omzet,
+      SUM(d.jumlah * i.harga_beli) AS total_modal,
+      (SUM(t.total) - SUM(d.jumlah * i.harga_beli)) AS total_keuntungan
+    FROM transactions t
+    JOIN transaction_items d ON t.id = d.transaction_id
+    JOIN items i ON d.item_id = i.id
+  `;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      return res.status(500).json({
+        status: 500,
+        message: "Gagal mengambil data resume",
+        error: err.message,
+      });
+    }
+
+    const summary = result[0];
+
+    // Ambil data omzet per hari (buat chart)
+    const sqlChart = `
+      SELECT 
+        DATE(t.tanggal) AS tanggal,
+        SUM(t.total) AS omzet_harian,
+        SUM(d.jumlah * i.harga_beli) AS modal_harian,
+        (SUM(t.total) - SUM(d.jumlah * i.harga_beli)) AS keuntungan_harian
+      FROM transactions t
+      JOIN transaction_items d ON t.id = d.transaction_id
+      JOIN items i ON d.item_id = i.id
+      GROUP BY DATE(t.tanggal)
+      ORDER BY tanggal ASC
+    `;
+
+    db.query(sqlChart, (err2, chartData) => {
+      if (err2) {
+        return res.status(500).json({
+          status: 500,
+          message: "Gagal mengambil data chart",
+          error: err2.message,
+        });
+      }
+
+      res.json({
+        status: 200,
+        message: "✅ Resume transaksi berhasil diambil",
+        data: {
+          summary,
+          chart: chartData,
+        },
+      });
+    });
+  });
+};
