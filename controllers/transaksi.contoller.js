@@ -19,12 +19,20 @@ export const createTransaksi = (req, res) => {
   }
 
   // Validasi total dan bayar
-  if (typeof total !== "number" || typeof bayar !== "number") {
+  // Ubah string menjadi number (jika perlu)
+  const parsedTotal = Number(total);
+  const parsedBayar = Number(bayar);
+
+  // Validasi hasil konversi
+  if (isNaN(parsedTotal) || isNaN(parsedBayar)) {
     return res.status(400).json({
       status: 400,
-      message: "Total dan bayar harus berupa angka",
+      message: "Total dan bayar harus berupa angka yang valid",
     });
   }
+
+  // Lanjut pakai nilai hasil konversi
+  kembalian = parsedBayar - parsedTotal;
 
   // Validasi kembalian
   if (bayar < total) {
