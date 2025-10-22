@@ -12,9 +12,13 @@ import { fileURLToPath } from "url";
 dotenv.config();
 const app = express();
 app.use(cors());
-app.use(express.json());
 
-// 📂 Setup penyimpanan file
+// ✅ Tambahkan parser global
+app.use(express.json()); // untuk JSON
+app.use(express.urlencoded({ extended: true })); // untuk form HTML biasa
+app.use(multer().none()); // 🔥 supaya semua route bisa baca FormData tanpa file
+
+// 📂 Setup penyimpanan file (untuk upload gambar)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -30,16 +34,15 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-
 // ✅ Routes
 app.use("/api/list/project", projectRoutes);
 app.use("/api/kasir", kasirRoutes);
 app.use("/api/transaksi", transaksiRoutes);
 
-// ✅ Folder static
+// ✅ Folder static untuk akses gambar
 app.use("/public", express.static(path.join(__dirname, "public")));
 
-// ✅ Root
+// ✅ Root endpoint
 app.get("/", (req, res) => {
   res.send("🚀 API Arbiverse aktif!");
 });
