@@ -8,17 +8,26 @@ import kasirRoutes from "./routes/kasir.router.js";
 import transaksiRoutes from "./routes/transaksi.router.js";
 import { fileURLToPath } from "url";
 
-// setup dasar
 dotenv.config();
 const app = express();
 app.use(cors());
 
-// ✅ Tambahkan parser global
-app.use(express.json()); // untuk JSON
-app.use(express.urlencoded({ extended: true })); // untuk form HTML biasa
-app.use(multer().none()); // 🔥 supaya semua route bisa baca FormData tanpa file
+// ✅ Middleware parser universal
+app.use((req, res, next) => {
+  const contentType = req.headers["content-type"];
 
-// 📂 Setup penyimpanan file (untuk upload gambar)
+  if (contentType?.includes("multipart/form-data")) {
+    // untuk FormData tanpa file
+    multer().none()(req, res, next);
+  } else if (contentType?.includes("application/x-www-form-urlencoded")) {
+    express.urlencoded({ extended: true })(req, res, next);
+  } else {
+    // untuk JSON
+    express.json()(req, res, next);
+  }
+});
+
+// 📂 Setup penyimpanan file (jika ada upload)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -39,12 +48,12 @@ app.use("/api/list/project", projectRoutes);
 app.use("/api/kasir", kasirRoutes);
 app.use("/api/transaksi", transaksiRoutes);
 
-// ✅ Folder static untuk akses gambar
+// ✅ Static folder
 app.use("/public", express.static(path.join(__dirname, "public")));
 
 // ✅ Root endpoint
 app.get("/", (req, res) => {
-  res.send("🚀 API Arbiverse aktif!");
+  res.send("🚀 API Arbiverse aktif dan bisa terima JSON & FormData!");
 });
 
 // ✅ Jalankan server

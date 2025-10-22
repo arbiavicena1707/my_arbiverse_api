@@ -4,36 +4,47 @@ import db from "../config/db.js";
 export const createTransaksi = (req, res) => {
   const role = req.user?.role;
   const kasir_id = req.user?.id;
-  const { items, total, bayar, kembalian } = req.body;
 
+  let { items, total, bayar, kembalian } = req.body;
+
+  // 🧾 Kalau pakai FormData, items masih string → parse dulu
+  if (typeof items === "string") {
+    try {
+      items = JSON.parse(items);
+    } catch (err) {
+      return res.status(400).json({
+        status: 400,
+        message: "Format items tidak valid",
+      });
+    }
+  }
+
+  // 🔢 Pastikan total, bayar, kembalian jadi number
+  total = Number(total);
+  bayar = Number(bayar);
+  kembalian = Number(kembalian);
+
+  // 🛡️ Validasi role
   if (role !== "kasir" && role !== "admin") {
     return res
       .status(403)
       .json({ status: 403, message: "Hanya kasir yang bisa membuat transaksi" });
   }
 
-  if (!items || items.length === 0) {
+  // 🛡️ Validasi data
+  if (!items || !Array.isArray(items) || items.length === 0) {
     return res
       .status(400)
       .json({ status: 400, message: "Daftar item tidak boleh kosong" });
   }
 
-  // Validasi total dan bayar
-  // Ubah string menjadi number (jika perlu)
-  const parsedTotal = Number(total);
-  const parsedBayar = Number(bayar);
-
-  // Validasi hasil konversi
-  if (isNaN(parsedTotal) || isNaN(parsedBayar)) {
+  if (isNaN(total) || isNaN(bayar)) {
     return res.status(400).json({
       status: 400,
-      message: "Total dan bayar harus berupa angka yang valid",
+      message: "Total dan bayar harus berupa angka",
     });
   }
 
-
-
-  // Validasi kembalian
   if (bayar < total) {
     return res.status(400).json({
       status: 400,
@@ -41,20 +52,19 @@ export const createTransaksi = (req, res) => {
     });
   }
 
-  // Simpan transaksi
+  // 💾 Simpan transaksi ke database...
   const sqlTransaksi =
     "INSERT INTO transactions (kasir_id, total, bayar, kembalian, tanggal) VALUES (?, ?, ?, ?, NOW())";
   db.query(sqlTransaksi, [kasir_id, total, bayar, kembalian], (err, result) => {
-    if (err)
+    if (err) {
       return res.status(500).json({
         status: 500,
         message: "Gagal menyimpan transaksi",
         error: err.message,
       });
+    }
 
     const transaksi_id = result.insertId;
-
-    // Simpan detail item transaksi
     const sqlDetail =
       "INSERT INTO transaction_items (transaction_id, item_id, jumlah, subtotal) VALUES ?";
     const values = items.map((item) => [
@@ -65,24 +75,25 @@ export const createTransaksi = (req, res) => {
     ]);
 
     db.query(sqlDetail, [values], (err2) => {
-      if (err2)
+      if (err2) {
         return res.status(500).json({
           status: 500,
           message: "Gagal menyimpan detail transaksi",
           error: err2.message,
         });
+      }
 
-      // ✅ Kurangi stok barang dengan prepared statement (AMAN dari SQL Injection)
-      let completedQueries = 0;
-      let hasError = false;
+      // Update stok
+      let completed = 0;
+      let failed = false;
 
       items.forEach((item) => {
         db.query(
           "UPDATE items SET stok = stok - ? WHERE id = ?",
           [item.qty, item.item_id],
           (err3) => {
-            if (err3 && !hasError) {
-              hasError = true;
+            if (err3 && !failed) {
+              failed = true;
               return res.status(500).json({
                 status: 500,
                 message: "Gagal mengupdate stok barang",
@@ -90,10 +101,8 @@ export const createTransaksi = (req, res) => {
               });
             }
 
-            completedQueries++;
-
-            // Jika semua query selesai
-            if (completedQueries === items.length && !hasError) {
+            completed++;
+            if (completed === items.length && !failed) {
               res.status(201).json({
                 status: 201,
                 message: "✅ Transaksi berhasil disimpan",
@@ -106,6 +115,7 @@ export const createTransaksi = (req, res) => {
     });
   });
 };
+
 
 // 🔹 Ambil semua transaksi (admin)
 export const getAllTransaksi = (req, res) => {
