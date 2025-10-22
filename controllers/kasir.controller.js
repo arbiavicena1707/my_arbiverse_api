@@ -140,6 +140,13 @@ export const addItem = (req, res) => {
       },
     });
   });
+  if (err)
+    return res.status(500).json({
+      status: 500,
+      message: "Gagal menambah item",
+      error: err.message,
+    });
+
 };
 
 
