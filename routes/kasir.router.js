@@ -6,6 +6,9 @@ import {
   getItems,
   updateItem,
   deleteItem,
+  getAllUsers,
+  updateUser,
+  deleteUser
 } from "../controllers/kasir.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import multer from "multer";
@@ -35,6 +38,11 @@ const upload = multer({ storage });
 // Auth routes
 router.post("/register", registerKasir);
 router.post("/login", loginKasir);
+
+// === 👑 ADMIN USER MANAGEMENT ===
+router.get("/users", verifyToken, getAllUsers);
+router.put("/users/:id", verifyToken, updateUser);
+router.delete("/users/:id", verifyToken, deleteUser);
 
 // Item routes (admin only)
 router.post("/item", verifyToken, upload.single("gambar"), addItem);

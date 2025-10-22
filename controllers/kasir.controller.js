@@ -2,6 +2,7 @@ import db from "../config/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
+
 // 🔹 REGISTER (khusus admin)
 export const registerKasir = (req, res) => {
   const { username, password, role } = req.body;
@@ -94,6 +95,103 @@ export const loginKasir = (req, res) => {
         token,
         user: { id: user.id, username: user.username, role: user.role },
       },
+    });
+  });
+};
+export const updateUser = async (req, res) => {
+  const role = req.user?.role;
+  const { id } = req.params;
+  const { username, password, role: newRole } = req.body;
+
+  if (role !== "admin")
+    return res.status(403).json({
+      status: 403,
+      message: "Hanya admin yang bisa mengubah user",
+    });
+
+  // Cek apakah user ada
+  db.query("SELECT * FROM users WHERE id = ?", [id], async (err, results) => {
+    if (err) return res.status(500).json({ status: 500, message: err.message });
+
+    if (results.length === 0)
+      return res.status(404).json({ status: 404, message: "User tidak ditemukan" });
+
+    const updates = [];
+    const values = [];
+
+    if (username) {
+      updates.push("username = ?");
+      values.push(username);
+    }
+
+    if (password) {
+      const hashed = await bcrypt.hash(password, 10);
+      updates.push("password = ?");
+      values.push(hashed);
+    }
+
+    if (newRole && ["admin", "kasir"].includes(newRole)) {
+      updates.push("role = ?");
+      values.push(newRole);
+    }
+
+    if (updates.length === 0)
+      return res.status(400).json({ status: 400, message: "Tidak ada data yang diupdate" });
+
+    values.push(id);
+
+    const sql = `UPDATE users SET ${updates.join(", ")} WHERE id = ?`;
+    db.query(sql, values, (err) => {
+      if (err)
+        return res.status(500).json({ status: 500, message: err.message });
+
+      res.json({
+        status: 200,
+        message: "✅ User berhasil diupdate",
+      });
+    });
+  });
+};
+
+export const deleteUser = (req, res) => {
+  const role = req.user?.role;
+  const { id } = req.params;
+
+  if (role !== "admin")
+    return res.status(403).json({
+      status: 403,
+      message: "Hanya admin yang bisa menghapus user",
+    });
+
+  db.query("DELETE FROM users WHERE id = ?", [id], (err, result) => {
+    if (err) return res.status(500).json({ status: 500, message: err.message });
+
+    if (result.affectedRows === 0)
+      return res.status(404).json({ status: 404, message: "User tidak ditemukan" });
+
+    res.json({
+      status: 200,
+      message: "✅ User berhasil dihapus",
+    });
+  });
+};  
+
+export const getAllUsers = (req, res) => {
+  const role = req.user?.role;
+
+  if (role !== "admin")
+    return res.status(403).json({
+      status: 403,
+      message: "Hanya admin yang bisa melihat daftar user",
+    });
+
+  db.query("SELECT id, username, role FROM users", (err, results) => {
+    if (err) return res.status(500).json({ status: 500, message: err.message });
+
+    res.json({
+      status: 200,
+      message: "✅ Daftar user berhasil diambil",
+      data: results,
     });
   });
 };
