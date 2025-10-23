@@ -13,35 +13,14 @@ const app = express();
 app.use(cors());
 
 // ✅ Middleware parser universal
-app.use((req, res, next) => {
-  const contentType = req.headers["content-type"];
-
-  if (contentType?.includes("multipart/form-data")) {
-    // untuk FormData tanpa file
-    multer().none()(req, res, next);
-  } else if (contentType?.includes("application/x-www-form-urlencoded")) {
-    express.urlencoded({ extended: true })(req, res, next);
-  } else {
-    // untuk JSON
-    express.json()(req, res, next);
-  }
-});
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // 📂 Setup penyimpanan file (jika ada upload)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "public"));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
 
-const upload = multer({ storage });
 
 // ✅ Routes
 app.use("/api/list/project", projectRoutes);
