@@ -11,7 +11,7 @@ const router = express.Router();
 
 router.post("/", verifyToken, upload.none(), createTransaksi); // kasir
 router.get("/", verifyToken, getAllTransaksi); // admin
-router.get("/resume", verifyToken, getTransaksiResume); // admin
+router.get("/resume", verifyToken, getTransaksiResume) ; // admin
 router.get("/:id", verifyToken, getTransaksiById); // admin/kasir
 
 export default router;
