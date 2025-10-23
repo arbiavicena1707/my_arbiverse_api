@@ -42,7 +42,7 @@ router.post("/login", upload.none(), loginKasir);
 
 // === 👑 ADMIN USER MANAGEMENT ===
 router.get("/users", verifyToken, getAllUsers);
-router.put("/users/:id", verifyToken, updateUser);
+router.put("/users/:id", verifyToken, upload.none(), updateUser);
 router.delete("/users/:id", verifyToken, deleteUser);
 
 // Item routes (admin only)
