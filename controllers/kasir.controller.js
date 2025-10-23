@@ -279,11 +279,11 @@ export const getItems = (req, res) => {
 };
 
 
-// 🔹 Update item (khusus admin)
 export const updateItem = (req, res) => {
   const { id } = req.params;
-  const { nama, harga, stok, gambar, kategori } = req.body;
+  const { nama, harga, stok, kategori } = req.body;
   const role = req.user?.role;
+  const gambarFile = req.file ? `/public/${req.file.filename}` : undefined;
 
   if (role !== "admin") {
     return res.status(403).json({
@@ -292,7 +292,6 @@ export const updateItem = (req, res) => {
     });
   }
 
-  // 🔸 Validasi kategori kalau dikirim
   const allowedKategori = ["makanan", "minuman", "snack"];
   if (kategori && !allowedKategori.includes(kategori)) {
     return res.status(400).json({
@@ -301,15 +300,16 @@ export const updateItem = (req, res) => {
     });
   }
 
-  // 🔸 Cek apakah item ada
   db.query("SELECT * FROM items WHERE id = ?", [id], (err, results) => {
-    if (err) return res.status(500).json({ status: 500, message: err.message });
+    if (err)
+      return res.status(500).json({ status: 500, message: err.message });
 
     if (results.length === 0) {
-      return res.status(404).json({ status: 404, message: "Item tidak ditemukan" });
+      return res
+        .status(404)
+        .json({ status: 404, message: "Item tidak ditemukan" });
     }
 
-    // 🔸 Siapkan data yang mau diupdate (hanya field yang dikirim)
     const updates = [];
     const values = [];
 
@@ -325,16 +325,15 @@ export const updateItem = (req, res) => {
       updates.push("stok = ?");
       values.push(stok);
     }
-    if (gambar !== undefined) {
+    if (gambarFile !== undefined) {
       updates.push("gambar = ?");
-      values.push(gambar);
+      values.push(gambarFile);
     }
     if (kategori !== undefined) {
       updates.push("kategori = ?");
       values.push(kategori);
     }
 
-    // 🔸 Jika tidak ada field dikirim
     if (updates.length === 0) {
       return res.status(400).json({
         status: 400,
@@ -342,7 +341,6 @@ export const updateItem = (req, res) => {
       });
     }
 
-    // 🔸 Jalankan query update
     values.push(id);
     const sql = `UPDATE items SET ${updates.join(", ")} WHERE id = ?`;
 
@@ -362,6 +360,7 @@ export const updateItem = (req, res) => {
     });
   });
 };
+
 
 // 🔹 Hapus item (khusus admin)
 export const deleteItem = (req, res) => {
