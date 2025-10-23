@@ -171,11 +171,15 @@ export const getTransaksiById = (req, res) => {
 
     // Ambil detail item
     const sqlDetail = `
-      SELECT d.*, i.nama AS item_name
-      FROM transaction_items d
-      JOIN items i ON d.item_id = i.id
-      WHERE d.transaction_id = ?
-    `;
+  SELECT 
+    d.*, 
+    i.nama AS item_name, 
+    i.kategori AS item_kategori
+  FROM transaction_items d
+  JOIN items i ON d.item_id = i.id
+  WHERE d.transaction_id = ?
+`;
+
 
     db.query(sqlDetail, [id], (err2, detail) => {
       if (err2)
