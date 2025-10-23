@@ -174,7 +174,7 @@ export const deleteUser = (req, res) => {
       message: "✅ User berhasil dihapus",
     });
   });
-};  
+};
 
 export const getAllUsers = (req, res) => {
   const role = req.user?.role;
@@ -185,7 +185,8 @@ export const getAllUsers = (req, res) => {
       message: "Hanya admin yang bisa melihat daftar user",
     });
 
-  db.query("SELECT id, username, role FROM users", (err, results) => {
+  // Perbarui query untuk mengambil `created_at` selain id, username, dan role
+  db.query("SELECT id, username, role, created_at FROM users", (err, results) => {
     if (err) return res.status(500).json({ status: 500, message: err.message });
 
     res.json({
