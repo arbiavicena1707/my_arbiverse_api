@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "../public")) ;
+    cb(null, path.join(__dirname, "../public"));
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -36,8 +36,9 @@ const upload = multer({ storage });
 // === 🔐 ROUTES ===
 
 // Auth routes
-router.post("/register", registerKasir);
-router.post("/login", loginKasir);
+router.post("/register", upload.none(), registerKasir);
+router.post("/login", upload.none(), loginKasir);
+
 
 // === 👑 ADMIN USER MANAGEMENT ===
 router.get("/users", verifyToken, getAllUsers);
