@@ -199,33 +199,44 @@ export const getAllUsers = (req, res) => {
 
 // 🔹 Tambah item (khusus admin)
 export const addItem = (req, res) => {
-  const { nama } = req.body;
-  const harga = Number(req.body.harga);
-  const stok = Number(req.body.stok);
+  const { nama, harga, stok, kategori } = req.body;
   const file = req.file;
   const gambar = file ? `/public/${file.filename}` : null;
   const role = req.user?.role;
 
-  if (role !== "admin")
+  if (role !== "admin") {
     return res.status(403).json({
       status: 403,
       message: "Hanya admin yang bisa menambah item",
     });
+  }
 
-  if (!nama || isNaN(harga) || isNaN(stok))
+  // Validasi input
+  if (!nama || isNaN(harga) || isNaN(stok)) {
     return res.status(400).json({
       status: 400,
       message: "Nama, harga, dan stok wajib diisi dengan benar",
     });
+  }
 
-  const sql = "INSERT INTO items (nama, harga, stok, gambar) VALUES (?, ?, ?, ?)";
-  db.query(sql, [nama, harga, stok, gambar], (err, result) => {
-    if (err)
+  // Validasi kategori
+  const allowedKategori = ["makanan", "minuman", "snack"];
+  if (kategori && !allowedKategori.includes(kategori)) {
+    return res.status(400).json({
+      status: 400,
+      message: "Kategori tidak valid. Gunakan: makanan, minuman, atau snack",
+    });
+  }
+
+  const sql = "INSERT INTO items (nama, harga, stok, gambar, kategori) VALUES (?, ?, ?, ?, ?)";
+  db.query(sql, [nama, harga, stok, gambar, kategori || "makanan"], (err, result) => {
+    if (err) {
       return res.status(500).json({
         status: 500,
         message: "Gagal menambah item",
         error: err.message,
       });
+    }
 
     res.status(201).json({
       status: 201,
@@ -236,22 +247,27 @@ export const addItem = (req, res) => {
         harga,
         stok,
         gambar,
+        kategori: kategori || "makanan",
       },
     });
   });
-  if (err)
-    return res.status(500).json({
-      status: 500,
-      message: "Gagal menambah item",
-      error: err.message,
-    });
-
 };
+
 
 
 // 🔹 Ambil semua item (admin & kasir)
 export const getItems = (req, res) => {
-  db.query("SELECT * FROM items", (err, results) => {
+  const { kategori } = req.query;
+
+  let sql = "SELECT * FROM items";
+  const values = [];
+
+  if (kategori) {
+    sql += " WHERE kategori = ?";
+    values.push(kategori);
+  }
+
+  db.query(sql, values, (err, results) => {
     if (err) return res.status(500).json({ status: 500, message: err.message });
 
     res.json({
@@ -262,26 +278,38 @@ export const getItems = (req, res) => {
   });
 };
 
+
 // 🔹 Update item (khusus admin)
 export const updateItem = (req, res) => {
   const { id } = req.params;
-  const { nama, harga, stok, gambar } = req.body;
+  const { nama, harga, stok, gambar, kategori } = req.body;
   const role = req.user?.role;
 
-  if (role !== "admin")
+  if (role !== "admin") {
     return res.status(403).json({
       status: 403,
       message: "Hanya admin yang bisa mengupdate item",
     });
+  }
 
-  // Cek apakah item ada
+  // 🔸 Validasi kategori kalau dikirim
+  const allowedKategori = ["makanan", "minuman", "snack"];
+  if (kategori && !allowedKategori.includes(kategori)) {
+    return res.status(400).json({
+      status: 400,
+      message: "Kategori tidak valid. Gunakan: makanan, minuman, atau snack",
+    });
+  }
+
+  // 🔸 Cek apakah item ada
   db.query("SELECT * FROM items WHERE id = ?", [id], (err, results) => {
     if (err) return res.status(500).json({ status: 500, message: err.message });
 
-    if (results.length === 0)
+    if (results.length === 0) {
       return res.status(404).json({ status: 404, message: "Item tidak ditemukan" });
+    }
 
-    // Update hanya field yang dikirim
+    // 🔸 Siapkan data yang mau diupdate (hanya field yang dikirim)
     const updates = [];
     const values = [];
 
@@ -301,7 +329,12 @@ export const updateItem = (req, res) => {
       updates.push("gambar = ?");
       values.push(gambar);
     }
+    if (kategori !== undefined) {
+      updates.push("kategori = ?");
+      values.push(kategori);
+    }
 
+    // 🔸 Jika tidak ada field dikirim
     if (updates.length === 0) {
       return res.status(400).json({
         status: 400,
@@ -309,16 +342,18 @@ export const updateItem = (req, res) => {
       });
     }
 
+    // 🔸 Jalankan query update
     values.push(id);
     const sql = `UPDATE items SET ${updates.join(", ")} WHERE id = ?`;
 
     db.query(sql, values, (err) => {
-      if (err)
+      if (err) {
         return res.status(500).json({
           status: 500,
           message: "Gagal mengupdate item",
           error: err.message,
         });
+      }
 
       res.json({
         status: 200,
