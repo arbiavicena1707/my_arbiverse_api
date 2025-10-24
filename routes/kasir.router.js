@@ -30,22 +30,25 @@ const storage = multer.diskStorage({
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
 });
-// === SETUP ===
-const uploadFile = multer({ storage }); // untuk file
-const uploadNone = multer(); // untuk form tanpa file
 
-// === AUTH ===
-router.post("/register", uploadNone.none(), registerKasir);
-router.post("/login", uploadNone.none(), loginKasir);
+const upload = multer({ storage });
 
-// === USERS ===
+// === 🔐 ROUTES ===
+
+// Auth routes
+router.post("/register", upload.none(), registerKasir);
+router.post("/login", upload.none(), loginKasir);
+
+
+// === 👑 ADMIN USER MANAGEMENT ===
 router.get("/users", verifyToken, getAllUsers);
-router.put("/users/:id", verifyToken, uploadNone.none(), updateUser);
+router.put("/users/:id", verifyToken, updateUser);
 router.delete("/users/:id", verifyToken, deleteUser);
 
-// === ITEMS ===
-router.post("/item", verifyToken, uploadFile.single("gambar"), addItem);
-router.put("/item/:id", verifyToken, uploadFile.single("gambar"), updateItem);
+// Item routes (admin only)
+router.post("/item", verifyToken, upload.single("gambar"), addItem);
+router.get("/item", verifyToken, getItems);
+router.put("/item/:id", verifyToken, upload.single("gambar"), updateItem);
 router.delete("/item/:id", verifyToken, deleteItem);
 
 export default router;
