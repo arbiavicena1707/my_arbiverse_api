@@ -118,43 +118,86 @@ export const createTransaksiUser = (req, res) => {
 // 🔹 Kasir ubah status transaksi (paid, processing, completed, canceled)
 export const updateTransaksiStatus = (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
-  const allowed = ["pending", "paid", "processing", "completed", "canceled"];
+  const role = req.user?.role;
+  const kasir_id = req.user?.id;
+  const { status, bayar } = req.body;
 
-  if (!allowed.includes(status)) {
-    return res.status(400).json({ status: 400, message: "Status tidak valid" });
-  }
+  if (role !== "kasir" && role !== "admin")
+    return res.status(403).json({ status: 403, message: "Hanya kasir atau admin yang boleh update transaksi" });
 
-  const sql = "UPDATE transactions SET status = ? WHERE id = ?";
-  db.query(sql, [status, id], (err, result) => {
+  const sqlGet = "SELECT * FROM transactions WHERE id = ?";
+  db.query(sqlGet, [id], (err, results) => {
     if (err) return res.status(500).json({ status: 500, message: err.message });
+    if (results.length === 0)
+      return res.status(404).json({ status: 404, message: "Transaksi tidak ditemukan" });
 
-    res.json({ status: 200, message: `✅ Status diubah menjadi ${status}` });
+    const transaksi = results[0];
+
+    // Hitung kembalian
+    const bayarAngka = Number(bayar || 0);
+    const kembalian = bayarAngka - transaksi.total;
+
+    const sqlUpdate = `
+      UPDATE transactions 
+      SET status = ?, bayar = ?, kembalian = ?, kasir_id = ?
+      WHERE id = ?
+    `;
+
+    db.query(sqlUpdate, [status || "completed", bayarAngka, kembalian, kasir_id, id], (err2) => {
+      if (err2) return res.status(500).json({ status: 500, message: err2.message });
+
+      res.json({
+        status: 200,
+        message: "✅ Transaksi berhasil diperbarui",
+        data: {
+          id,
+          status: status || "completed",
+          total: transaksi.total,
+          bayar: bayarAngka,
+          kembalian,
+        },
+      });
+    });
   });
 };
+
 
 
 // 🔹 Ambil semua transaksi (admin)
 export const getAllTransaksi = (req, res) => {
   const role = req.user?.role;
-  if (role !== "admin")
-    return res
-      .status(403)
-      .json({ status: 403, message: "Hanya admin yang bisa melihat semua transaksi" });
+  const userId = req.user?.id;
+  const { status } = req.query;
 
-  const sql = `
-    SELECT t.id, u.username AS kasir, t.total, t.bayar, t.kembalian, t.tanggal
+  let sql = `
+    SELECT 
+      t.*, 
+      u.username AS kasir
     FROM transactions t
-    JOIN users u ON t.kasir_id = u.id
-    ORDER BY t.id DESC
+    LEFT JOIN users u ON t.kasir_id = u.id
   `;
-  db.query(sql, (err, results) => {
-    if (err)
-      return res.status(500).json({ status: 500, message: err.message });
+  const values = [];
 
-    res.json({ status: 200, message: "✅ Data transaksi berhasil diambil", data: results });
+  if (role === "kasir") {
+    sql += " WHERE t.status = ?";
+    values.push(status); // default pending
+  } else if (role === "admin" && status) {
+    sql += " WHERE t.status = ?";
+    values.push(status);
+  }
+
+  sql += " ORDER BY t.tanggal DESC";
+
+  db.query(sql, values, (err, results) => {
+    if (err) return res.status(500).json({ status: 500, message: err.message });
+    res.json({
+      status: 200,
+      message: "✅ Daftar transaksi berhasil diambil",
+      data: results,
+    });
   });
 };
+
 
 // 🔹 Ambil detail transaksi (admin/kasir)
 export const getTransaksiById = (req, res) => {
