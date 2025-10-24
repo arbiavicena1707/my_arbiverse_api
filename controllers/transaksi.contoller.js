@@ -5,16 +5,20 @@ const generateKode = () => "GY" + crypto.randomBytes(3).toString("hex").toUpperC
 
 
 export const createTransaksi = (req, res) => {
-  const role = req.user?.role;
-  const kasir_id = req.user?.id;
+  const role = req.user?.role || "user"; // kalau gak ada token → otomatis user
+  const kasir_id = req.user?.id || null;
+
   let { items, total, bayar, kembalian, metode } = req.body;
 
-  // 🧾 Parse FormData items (kalau masih string)
+  // 🧾 Parse items dari FormData
   if (typeof items === "string") {
     try {
       items = JSON.parse(items);
     } catch {
-      return res.status(400).json({ status: 400, message: "Format items tidak valid" });
+      return res.status(400).json({
+        status: 400,
+        message: "Format items tidak valid",
+      });
     }
   }
 
@@ -23,42 +27,51 @@ export const createTransaksi = (req, res) => {
   kembalian = Number(kembalian || 0);
   metode = metode || "kasir";
 
-  if (role !== "kasir" && role !== "admin") {
-    return res.status(403).json({ status: 403, message: "Hanya kasir yang bisa membuat transaksi ini" });
-  }
+  // 🛡️ Validasi item
+  if (!items?.length)
+    return res.status(400).json({ status: 400, message: "Daftar item tidak boleh kosong" });
+  if (isNaN(total))
+    return res.status(400).json({ status: 400, message: "Total harus berupa angka" });
 
-  if (!items?.length) return res.status(400).json({ status: 400, message: "Daftar item tidak boleh kosong" });
-  if (isNaN(total)) return res.status(400).json({ status: 400, message: "Total harus berupa angka" });
-
+  // 🧩 Tentukan status otomatis
   const kode_transaksi = generateKode();
-  const status = "completed"; // kasir langsung selesai karena bayar langsung
+  const status = role === "kasir" || role === "admin" ? "completed" : "pending";
 
-  const sql =
-    "INSERT INTO transactions (kode_transaksi, kasir_id, total, bayar, kembalian, metode, status, tanggal) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+  // 💾 Simpan transaksi
+  const sql = `
+    INSERT INTO transactions 
+    (kode_transaksi, kasir_id, total, bayar, kembalian, metode, status, tanggal)
+    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+  `;
+
   db.query(sql, [kode_transaksi, kasir_id, total, bayar, kembalian, metode, status], (err, result) => {
     if (err) return res.status(500).json({ status: 500, message: err.message });
 
     const transaksi_id = result.insertId;
-    const sqlDetail =
-      "INSERT INTO transaction_items (transaction_id, item_id, jumlah, subtotal) VALUES ?";
+    const sqlDetail = `
+      INSERT INTO transaction_items (transaction_id, item_id, jumlah, subtotal) VALUES ?
+    `;
     const values = items.map((i) => [transaksi_id, i.item_id, i.qty, i.subtotal]);
 
     db.query(sqlDetail, [values], (err2) => {
       if (err2) return res.status(500).json({ status: 500, message: err2.message });
 
-      // Kurangi stok
-      items.forEach((i) => {
-        db.query("UPDATE items SET stok = stok - ? WHERE id = ?", [i.qty, i.item_id]);
-      });
+      // Kalau kasir → langsung kurangi stok
+      if (role === "kasir" || role === "admin") {
+        items.forEach((i) => {
+          db.query("UPDATE items SET stok = stok - ? WHERE id = ?", [i.qty, i.item_id]);
+        });
+      }
 
       res.status(201).json({
         status: 201,
-        message: "✅ Transaksi kasir berhasil disimpan",
-        data: { kode_transaksi, total, bayar, kembalian, metode },
+        message: `✅ Transaksi berhasil disimpan (${status})`,
+        data: { kode_transaksi, status, total, metode },
       });
     });
   });
 };
+
 
 // 🔹 Transaksi dari user (baru)
 export const createTransaksiUser = (req, res) => {
