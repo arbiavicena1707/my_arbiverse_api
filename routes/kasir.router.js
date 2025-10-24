@@ -35,8 +35,8 @@ const uploadFile = multer({ storage }); // untuk file
 const uploadNone = multer(); // untuk form tanpa file
 
 // === AUTH ===
-router.post("/register",  registerKasir);
-router.post("/login", loginKasir);
+router.post("/register", upload.none(), registerKasir);
+router.post("/login", upload.none(), loginKasir);
 
 // === USERS ===
 router.get("/users", verifyToken, getAllUsers);
