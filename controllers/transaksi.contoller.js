@@ -264,16 +264,13 @@ export const getTransaksiResume = (req, res) => {
     });
   }
 
-  // Ambil total omzet, total modal, dan keuntungan
+  // Query total transaksi dan total omzet
   const sql = `
     SELECT 
-      COUNT(DISTINCT t.id) AS total_transaksi,
-      SUM(t.total) AS total_omzet,
-      SUM(d.jumlah * i.harga_beli) AS total_modal,
-      (SUM(t.total) - SUM(d.jumlah * i.harga_beli)) AS total_keuntungan
-    FROM transactions t
-    JOIN transaction_items d ON t.id = d.transaction_id
-    JOIN items i ON d.item_id = i.id
+      COUNT(id) AS total_transaksi,
+      SUM(total) AS total_omzet
+    FROM transactions
+    WHERE status IN ('paid', 'completed')
   `;
 
   db.query(sql, (err, result) => {
@@ -286,18 +283,17 @@ export const getTransaksiResume = (req, res) => {
     }
 
     const summary = result[0];
+    summary.total_modal = 0; // tidak ada data modal di tabel
+    summary.total_keuntungan = summary.total_omzet; // asumsikan semua omzet adalah keuntungan
 
-    // Ambil data omzet per hari (buat chart)
+    // Query omzet per hari untuk chart
     const sqlChart = `
       SELECT 
-        DATE(t.tanggal) AS tanggal,
-        SUM(t.total) AS omzet_harian,
-        SUM(d.jumlah * i.harga_beli) AS modal_harian,
-        (SUM(t.total) - SUM(d.jumlah * i.harga_beli)) AS keuntungan_harian
-      FROM transactions t
-      JOIN transaction_items d ON t.id = d.transaction_id
-      JOIN items i ON d.item_id = i.id
-      GROUP BY DATE(t.tanggal)
+        DATE(tanggal) AS tanggal,
+        SUM(total) AS omzet_harian
+      FROM transactions
+      WHERE status IN ('paid', 'completed')
+      GROUP BY DATE(tanggal)
       ORDER BY tanggal ASC
     `;
 
@@ -321,3 +317,4 @@ export const getTransaksiResume = (req, res) => {
     });
   });
 };
+
