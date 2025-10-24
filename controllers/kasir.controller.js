@@ -98,6 +98,7 @@ export const loginKasir = (req, res) => {
     });
   });
 };
+
 export const updateUser = async (req, res) => {
   const role = req.user?.role;
   const { id } = req.params;
