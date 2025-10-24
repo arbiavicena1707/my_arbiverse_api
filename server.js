@@ -10,13 +10,7 @@ import { fileURLToPath } from "url";
 
 dotenv.config();
 const app = express();
-app.use(
-  cors({
-    origin: "*", // ⬅️ semua origin diizinkan
-    methods: "*", // ⬅️ semua method diizinkan (GET, POST, PUT, DELETE, PATCH, OPTIONS, dsb)
-    allowedHeaders: "*", // ⬅️ semua header diperbolehkan
-  })
-);
+app.use(cors());
 
 // ✅ Middleware parser universal
 app.use(express.json());
