@@ -8,7 +8,7 @@ import {
   deleteItem,
   getAllUsers,
   updateUser,
-  deleteUser
+  deleteUser,
 } from "../controllers/kasir.controller.js";
 import { verifyToken } from "../middleware/auth.js";
 import multer from "multer";
@@ -35,20 +35,26 @@ const upload = multer({ storage });
 
 // === 🔐 ROUTES ===
 
-// Auth routes
+// 🔹 Auth routes
 router.post("/register", upload.none(), registerKasir);
 router.post("/login", upload.none(), loginKasir);
-
 
 // === 👑 ADMIN USER MANAGEMENT ===
 router.get("/users", verifyToken, getAllUsers);
 router.put("/users/:id", verifyToken, updateUser);
 router.delete("/users/:id", verifyToken, deleteUser);
 
-// Item routes (admin only)
+// === 🛒 ITEM MANAGEMENT ===
+// Admin-only routes
 router.post("/item", verifyToken, upload.single("gambar"), addItem);
-router.get("/item", verifyToken, getItems);
 router.put("/item/:id", verifyToken, upload.single("gambar"), updateItem);
 router.delete("/item/:id", verifyToken, deleteItem);
+
+// Kasir & admin bisa lihat semua item
+router.get("/item", verifyToken, getItems);
+
+// === 🍔 PUBLIC MENU (buat user layar pesanan) ===
+// route tanpa verifyToken supaya bisa diakses user tanpa login
+router.get("/public/menu", getItems);
 
 export default router;

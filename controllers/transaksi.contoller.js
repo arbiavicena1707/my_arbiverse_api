@@ -1,118 +1,122 @@
 import db from "../config/db.js";
+import crypto from "crypto";
 
-// 🔹 Simpan transaksi baru (kasir)
+const generateKode = () => "GY" + crypto.randomBytes(3).toString("hex").toUpperCase();
+
+
 export const createTransaksi = (req, res) => {
   const role = req.user?.role;
   const kasir_id = req.user?.id;
+  let { items, total, bayar, kembalian, metode } = req.body;
 
-  let { items, total, bayar, kembalian } = req.body;
-
-  // 🧾 Kalau pakai FormData, items masih string → parse dulu
+  // 🧾 Parse FormData items (kalau masih string)
   if (typeof items === "string") {
     try {
       items = JSON.parse(items);
-    } catch (err) {
-      return res.status(400).json({
-        status: 400,
-        message: "Format items tidak valid",
-      });
+    } catch {
+      return res.status(400).json({ status: 400, message: "Format items tidak valid" });
     }
   }
 
-  // 🔢 Pastikan total, bayar, kembalian jadi number
   total = Number(total);
-  bayar = Number(bayar);
-  kembalian = Number(kembalian);
+  bayar = Number(bayar || 0);
+  kembalian = Number(kembalian || 0);
+  metode = metode || "kasir";
 
-  // 🛡️ Validasi role
   if (role !== "kasir" && role !== "admin") {
-    return res
-      .status(403)
-      .json({ status: 403, message: "Hanya kasir yang bisa membuat transaksi" });
+    return res.status(403).json({ status: 403, message: "Hanya kasir yang bisa membuat transaksi ini" });
   }
 
-  // 🛡️ Validasi data
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res
-      .status(400)
-      .json({ status: 400, message: "Daftar item tidak boleh kosong" });
-  }
+  if (!items?.length) return res.status(400).json({ status: 400, message: "Daftar item tidak boleh kosong" });
+  if (isNaN(total)) return res.status(400).json({ status: 400, message: "Total harus berupa angka" });
 
-  if (isNaN(total) || isNaN(bayar)) {
-    return res.status(400).json({
-      status: 400,
-      message: "Total dan bayar harus berupa angka",
-    });
-  }
+  const kode_transaksi = generateKode();
+  const status = "completed"; // kasir langsung selesai karena bayar langsung
 
-  if (bayar < total) {
-    return res.status(400).json({
-      status: 400,
-      message: "Uang bayar kurang dari total",
-    });
-  }
-
-  // 💾 Simpan transaksi ke database...
-  const sqlTransaksi =
-    "INSERT INTO transactions (kasir_id, total, bayar, kembalian, tanggal) VALUES (?, ?, ?, ?, NOW())";
-  db.query(sqlTransaksi, [kasir_id, total, bayar, kembalian], (err, result) => {
-    if (err) {
-      return res.status(500).json({
-        status: 500,
-        message: "Gagal menyimpan transaksi",
-        error: err.message,
-      });
-    }
+  const sql =
+    "INSERT INTO transactions (kode_transaksi, kasir_id, total, bayar, kembalian, metode, status, tanggal) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+  db.query(sql, [kode_transaksi, kasir_id, total, bayar, kembalian, metode, status], (err, result) => {
+    if (err) return res.status(500).json({ status: 500, message: err.message });
 
     const transaksi_id = result.insertId;
     const sqlDetail =
       "INSERT INTO transaction_items (transaction_id, item_id, jumlah, subtotal) VALUES ?";
-    const values = items.map((item) => [
-      transaksi_id,
-      item.item_id,
-      item.qty,
-      item.subtotal,
-    ]);
+    const values = items.map((i) => [transaksi_id, i.item_id, i.qty, i.subtotal]);
 
     db.query(sqlDetail, [values], (err2) => {
-      if (err2) {
-        return res.status(500).json({
-          status: 500,
-          message: "Gagal menyimpan detail transaksi",
-          error: err2.message,
-        });
-      }
+      if (err2) return res.status(500).json({ status: 500, message: err2.message });
 
-      // Update stok
-      let completed = 0;
-      let failed = false;
+      // Kurangi stok
+      items.forEach((i) => {
+        db.query("UPDATE items SET stok = stok - ? WHERE id = ?", [i.qty, i.item_id]);
+      });
 
-      items.forEach((item) => {
-        db.query(
-          "UPDATE items SET stok = stok - ? WHERE id = ?",
-          [item.qty, item.item_id],
-          (err3) => {
-            if (err3 && !failed) {
-              failed = true;
-              return res.status(500).json({
-                status: 500,
-                message: "Gagal mengupdate stok barang",
-                error: err3.message,
-              });
-            }
-
-            completed++;
-            if (completed === items.length && !failed) {
-              res.status(201).json({
-                status: 201,
-                message: "✅ Transaksi berhasil disimpan",
-                data: { transaksi_id, total, bayar, kembalian, items },
-              });
-            }
-          }
-        );
+      res.status(201).json({
+        status: 201,
+        message: "✅ Transaksi kasir berhasil disimpan",
+        data: { kode_transaksi, total, bayar, kembalian, metode },
       });
     });
+  });
+};
+
+// 🔹 Transaksi dari user (baru)
+export const createTransaksiUser = (req, res) => {
+  let { items, total, metode } = req.body;
+
+  if (typeof items === "string") {
+    try {
+      items = JSON.parse(items);
+    } catch {
+      return res.status(400).json({ status: 400, message: "Format items tidak valid" });
+    }
+  }
+
+  total = Number(total);
+  metode = metode || "kasir";
+  const kode_transaksi = generateKode();
+  const status = "pending";
+
+  if (!items?.length) return res.status(400).json({ status: 400, message: "Daftar item tidak boleh kosong" });
+  if (isNaN(total)) return res.status(400).json({ status: 400, message: "Total harus berupa angka" });
+
+  const sql =
+    "INSERT INTO transactions (kode_transaksi, total, metode, status, tanggal) VALUES (?, ?, ?, ?, NOW())";
+  db.query(sql, [kode_transaksi, total, metode, status], (err, result) => {
+    if (err) return res.status(500).json({ status: 500, message: err.message });
+
+    const transaksi_id = result.insertId;
+    const sqlDetail =
+      "INSERT INTO transaction_items (transaction_id, item_id, jumlah, subtotal) VALUES ?";
+    const values = items.map((i) => [transaksi_id, i.item_id, i.qty, i.subtotal]);
+
+    db.query(sqlDetail, [values], (err2) => {
+      if (err2) return res.status(500).json({ status: 500, message: err2.message });
+
+      res.status(201).json({
+        status: 201,
+        message: "✅ Pesanan user berhasil dibuat",
+        data: { kode_transaksi, total, metode, status },
+      });
+    });
+  });
+};
+
+// 🔹 Kasir ubah status transaksi (paid, processing, completed, canceled)
+export const updateTransaksiStatus = (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const allowed = ["pending", "paid", "processing", "completed", "canceled"];
+
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ status: 400, message: "Status tidak valid" });
+  }
+
+  const sql = "UPDATE transactions SET status = ? WHERE id = ?";
+  db.query(sql, [status, id], (err, result) => {
+    if (err) return res.status(500).json({ status: 500, message: err.message });
+
+    res.json({ status: 200, message: `✅ Status diubah menjadi ${status}` });
   });
 };
 

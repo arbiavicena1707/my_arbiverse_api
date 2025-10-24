@@ -2,23 +2,24 @@ import db from "../config/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-
-// 🔹 REGISTER (khusus admin)
+// 🔹 REGISTER (admin / kasir / user)
 export const registerKasir = (req, res) => {
   const { username, password, role } = req.body;
+  const selectedRole = role || "user"; // 🆕 default: user
 
-  if (!username || !password || !role) {
+  if (!username || !password) {
     return res.status(400).json({
       status: 400,
-      message: "Data belum lengkap (username, password, role wajib diisi)",
+      message: "Username dan password wajib diisi",
     });
   }
 
   // Validasi role
-  if (!["admin", "kasir"].includes(role)) {
+  const allowedRoles = ["admin", "kasir", "user"];
+  if (!allowedRoles.includes(selectedRole)) {
     return res.status(400).json({
       status: 400,
-      message: "Role harus 'admin' atau 'kasir'",
+      message: "Role tidak valid. Gunakan: admin, kasir, atau user",
     });
   }
 
@@ -33,7 +34,7 @@ export const registerKasir = (req, res) => {
 
     db.query(
       "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-      [username, hashed, role],
+      [username, hashed, selectedRole],
       (err, result) => {
         if (err)
           return res.status(500).json({
@@ -45,7 +46,7 @@ export const registerKasir = (req, res) => {
         res.status(201).json({
           status: 201,
           message: "✅ User berhasil dibuat",
-          data: { id: result.insertId, username, role },
+          data: { id: result.insertId, username, role: selectedRole },
         });
       }
     );
@@ -99,21 +100,34 @@ export const loginKasir = (req, res) => {
   });
 };
 
+// 🔹 GET ALL USERS (Admin only)
+export const getAllUsers = (req, res) => {
+  const role = req.user?.role;
+  if (role !== "admin")
+    return res.status(403).json({ status: 403, message: "Hanya admin yang bisa melihat daftar user" });
+
+  db.query("SELECT id, username, role, created_at FROM users", (err, results) => {
+    if (err) return res.status(500).json({ status: 500, message: err.message });
+
+    res.json({
+      status: 200,
+      message: "✅ Daftar user berhasil diambil",
+      data: results,
+    });
+  });
+};
+
+// 🔹 UPDATE USER (Admin only)
 export const updateUser = async (req, res) => {
   const role = req.user?.role;
   const { id } = req.params;
   const { username, password, role: newRole } = req.body;
 
   if (role !== "admin")
-    return res.status(403).json({
-      status: 403,
-      message: "Hanya admin yang bisa mengubah user",
-    });
+    return res.status(403).json({ status: 403, message: "Hanya admin yang bisa mengubah user" });
 
-  // Cek apakah user ada
   db.query("SELECT * FROM users WHERE id = ?", [id], async (err, results) => {
     if (err) return res.status(500).json({ status: 500, message: err.message });
-
     if (results.length === 0)
       return res.status(404).json({ status: 404, message: "User tidak ditemukan" });
 
@@ -124,14 +138,12 @@ export const updateUser = async (req, res) => {
       updates.push("username = ?");
       values.push(username);
     }
-
     if (password) {
       const hashed = await bcrypt.hash(password, 10);
       updates.push("password = ?");
       values.push(hashed);
     }
-
-    if (newRole && ["admin", "kasir"].includes(newRole)) {
+    if (newRole && ["admin", "kasir", "user"].includes(newRole)) {
       updates.push("role = ?");
       values.push(newRole);
     }
@@ -140,8 +152,8 @@ export const updateUser = async (req, res) => {
       return res.status(400).json({ status: 400, message: "Tidak ada data yang diupdate" });
 
     values.push(id);
-
     const sql = `UPDATE users SET ${updates.join(", ")} WHERE id = ?`;
+
     db.query(sql, values, (err) => {
       if (err)
         return res.status(500).json({ status: 500, message: err.message });
@@ -154,19 +166,16 @@ export const updateUser = async (req, res) => {
   });
 };
 
+// 🔹 DELETE USER (Admin only)
 export const deleteUser = (req, res) => {
   const role = req.user?.role;
   const { id } = req.params;
 
   if (role !== "admin")
-    return res.status(403).json({
-      status: 403,
-      message: "Hanya admin yang bisa menghapus user",
-    });
+    return res.status(403).json({ status: 403, message: "Hanya admin yang bisa menghapus user" });
 
   db.query("DELETE FROM users WHERE id = ?", [id], (err, result) => {
     if (err) return res.status(500).json({ status: 500, message: err.message });
-
     if (result.affectedRows === 0)
       return res.status(404).json({ status: 404, message: "User tidak ditemukan" });
 
@@ -177,28 +186,7 @@ export const deleteUser = (req, res) => {
   });
 };
 
-export const getAllUsers = (req, res) => {
-  const role = req.user?.role;
-
-  if (role !== "admin")
-    return res.status(403).json({
-      status: 403,
-      message: "Hanya admin yang bisa melihat daftar user",
-    });
-
-  // Perbarui query untuk mengambil `created_at` selain id, username, dan role
-  db.query("SELECT id, username, role, created_at FROM users", (err, results) => {
-    if (err) return res.status(500).json({ status: 500, message: err.message });
-
-    res.json({
-      status: 200,
-      message: "✅ Daftar user berhasil diambil",
-      data: results,
-    });
-  });
-};
-
-// 🔹 Tambah item (khusus admin)
+// 🔹 ITEM CRUD
 export const addItem = (req, res) => {
   const { nama, harga, stok, kategori } = req.body;
   const file = req.file;
@@ -206,13 +194,9 @@ export const addItem = (req, res) => {
   const role = req.user?.role;
 
   if (role !== "admin") {
-    return res.status(403).json({
-      status: 403,
-      message: "Hanya admin yang bisa menambah item",
-    });
+    return res.status(403).json({ status: 403, message: "Hanya admin yang bisa menambah item" });
   }
 
-  // Validasi input
   if (!nama || isNaN(harga) || isNaN(stok)) {
     return res.status(400).json({
       status: 400,
@@ -220,7 +204,6 @@ export const addItem = (req, res) => {
     });
   }
 
-  // Validasi kategori
   const allowedKategori = ["makanan", "minuman", "snack"];
   if (kategori && !allowedKategori.includes(kategori)) {
     return res.status(400).json({
@@ -231,35 +214,19 @@ export const addItem = (req, res) => {
 
   const sql = "INSERT INTO items (nama, harga, stok, gambar, kategori) VALUES (?, ?, ?, ?, ?)";
   db.query(sql, [nama, harga, stok, gambar, kategori || "makanan"], (err, result) => {
-    if (err) {
-      return res.status(500).json({
-        status: 500,
-        message: "Gagal menambah item",
-        error: err.message,
-      });
-    }
+    if (err)
+      return res.status(500).json({ status: 500, message: "Gagal menambah item", error: err.message });
 
     res.status(201).json({
       status: 201,
       message: "✅ Item berhasil ditambahkan",
-      data: {
-        id: result.insertId,
-        nama,
-        harga,
-        stok,
-        gambar,
-        kategori: kategori || "makanan",
-      },
+      data: { id: result.insertId, nama, harga, stok, gambar, kategori: kategori || "makanan" },
     });
   });
 };
 
-
-
-// 🔹 Ambil semua item (admin & kasir)
 export const getItems = (req, res) => {
   const { kategori } = req.query;
-
   let sql = "SELECT * FROM items";
   const values = [];
 
@@ -279,7 +246,6 @@ export const getItems = (req, res) => {
   });
 };
 
-
 export const updateItem = (req, res) => {
   const { id } = req.params;
   const { nama, harga, stok, kategori } = req.body;
@@ -287,102 +253,54 @@ export const updateItem = (req, res) => {
   const gambarFile = req.file ? `/public/${req.file.filename}` : undefined;
 
   if (role !== "admin") {
-    return res.status(403).json({
-      status: 403,
-      message: "Hanya admin yang bisa mengupdate item",
-    });
+    return res.status(403).json({ status: 403, message: "Hanya admin yang bisa mengupdate item" });
   }
 
   const allowedKategori = ["makanan", "minuman", "snack"];
   if (kategori && !allowedKategori.includes(kategori)) {
-    return res.status(400).json({
-      status: 400,
-      message: "Kategori tidak valid. Gunakan: makanan, minuman, atau snack",
-    });
+    return res.status(400).json({ status: 400, message: "Kategori tidak valid" });
   }
 
   db.query("SELECT * FROM items WHERE id = ?", [id], (err, results) => {
-    if (err)
-      return res.status(500).json({ status: 500, message: err.message });
-
-    if (results.length === 0) {
-      return res
-        .status(404)
-        .json({ status: 404, message: "Item tidak ditemukan" });
-    }
+    if (err) return res.status(500).json({ status: 500, message: err.message });
+    if (results.length === 0)
+      return res.status(404).json({ status: 404, message: "Item tidak ditemukan" });
 
     const updates = [];
     const values = [];
 
-    if (nama !== undefined) {
-      updates.push("nama = ?");
-      values.push(nama);
-    }
-    if (harga !== undefined) {
-      updates.push("harga = ?");
-      values.push(harga);
-    }
-    if (stok !== undefined) {
-      updates.push("stok = ?");
-      values.push(stok);
-    }
-    if (gambarFile !== undefined) {
-      updates.push("gambar = ?");
-      values.push(gambarFile);
-    }
-    if (kategori !== undefined) {
-      updates.push("kategori = ?");
-      values.push(kategori);
-    }
+    if (nama !== undefined) { updates.push("nama = ?"); values.push(nama); }
+    if (harga !== undefined) { updates.push("harga = ?"); values.push(harga); }
+    if (stok !== undefined) { updates.push("stok = ?"); values.push(stok); }
+    if (gambarFile !== undefined) { updates.push("gambar = ?"); values.push(gambarFile); }
+    if (kategori !== undefined) { updates.push("kategori = ?"); values.push(kategori); }
 
-    if (updates.length === 0) {
-      return res.status(400).json({
-        status: 400,
-        message: "Tidak ada data yang diupdate",
-      });
-    }
+    if (updates.length === 0)
+      return res.status(400).json({ status: 400, message: "Tidak ada data yang diupdate" });
 
     values.push(id);
     const sql = `UPDATE items SET ${updates.join(", ")} WHERE id = ?`;
-
     db.query(sql, values, (err) => {
-      if (err) {
-        return res.status(500).json({
-          status: 500,
-          message: "Gagal mengupdate item",
-          error: err.message,
-        });
-      }
+      if (err)
+        return res.status(500).json({ status: 500, message: "Gagal mengupdate item", error: err.message });
 
-      res.json({
-        status: 200,
-        message: "✅ Item berhasil diupdate",
-      });
+      res.json({ status: 200, message: "✅ Item berhasil diupdate" });
     });
   });
 };
 
-
-// 🔹 Hapus item (khusus admin)
 export const deleteItem = (req, res) => {
   const { id } = req.params;
   const role = req.user?.role;
 
   if (role !== "admin")
-    return res.status(403).json({
-      status: 403,
-      message: "Hanya admin yang bisa menghapus item",
-    });
+    return res.status(403).json({ status: 403, message: "Hanya admin yang bisa menghapus item" });
 
   db.query("DELETE FROM items WHERE id = ?", [id], (err, result) => {
     if (err) return res.status(500).json({ status: 500, message: err.message });
-
     if (result.affectedRows === 0)
       return res.status(404).json({ status: 404, message: "Item tidak ditemukan" });
 
-    res.json({
-      status: 200,
-      message: "✅ Item berhasil dihapus",
-    });
+    res.json({ status: 200, message: "✅ Item berhasil dihapus" });
   });
 };

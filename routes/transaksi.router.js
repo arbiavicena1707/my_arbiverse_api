@@ -2,18 +2,25 @@ import express from "express";
 import multer from "multer";
 import {
   createTransaksi,
+  createTransaksiUser,
   getAllTransaksi,
   getTransaksiById,
   getTransaksiResume,
+  updateTransaksiStatus,
 } from "../controllers/transaksi.contoller.js";
 import { verifyToken } from "../middleware/auth.js";
 
 const router = express.Router();
-const upload = multer(); // <--- Tambahkan ini
+const upload = multer();
 
-router.post("/", verifyToken, upload.none(), createTransaksi); // kasir
-router.get("/", verifyToken, getAllTransaksi); // admin
-router.get("/resume", verifyToken, getTransaksiResume); // admin
-router.get("/:id", verifyToken, getTransaksiById); // admin/kasir
+// 🔹 Transaksi kasir (pakai token)
+router.post("/", verifyToken, upload.none(), createTransaksi);
+router.get("/", verifyToken, getAllTransaksi);
+router.get("/resume", verifyToken, getTransaksiResume);
+router.get("/:id", verifyToken, getTransaksiById);
+router.put("/status/:id", verifyToken, upload.none(), updateTransaksiStatus);
+
+// 🔹 Transaksi user (public)
+router.post("/user", upload.none(), createTransaksiUser);
 
 export default router;
