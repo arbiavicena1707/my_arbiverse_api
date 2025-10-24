@@ -8,13 +8,13 @@ import {
   getTransaksiResume,
   updateTransaksiStatus,
 } from "../controllers/transaksi.contoller.js";
-import { verifyToken } from "../middleware/auth.js";
+import { verifyToken, verifyTokenOptional } from "../middleware/auth.js";
 
 const router = express.Router();
 const upload = multer();
 
 // 🔹 Transaksi kasir (pakai token)
-router.post("/", verifyToken, upload.none(), createTransaksi);
+router.post("/", verifyTokenOptional, upload.none(), createTransaksi);
 router.get("/", verifyToken, getAllTransaksi);
 router.get("/resume", verifyToken, getTransaksiResume);
 router.get("/:id", verifyToken, getTransaksiById);

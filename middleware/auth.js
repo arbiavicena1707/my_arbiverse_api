@@ -12,3 +12,17 @@ export const verifyToken = (req, res, next) => {
     res.status(403).json({ message: "Token tidak valid atau expired" });
   }
 };
+
+export const verifyTokenOptional = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    try {
+      req.user = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      req.user = null;
+    }
+  }
+  next();
+};
+
