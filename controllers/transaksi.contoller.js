@@ -221,13 +221,7 @@ export const getTransaksiById = (req, res) => {
 
     const transaksi = result[0];
 
-    // Kasir hanya boleh lihat transaksi miliknya sendiri
-    if (role === "kasir" && transaksi.kasir_id !== userId) {
-      return res.status(403).json({
-        status: 403,
-        message: "Kamu tidak boleh mengakses transaksi ini",
-      });
-    }
+
 
     // Ambil detail item
     const sqlDetail = `
