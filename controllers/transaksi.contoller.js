@@ -169,6 +169,7 @@ export const getAllTransaksi = (req, res) => {
   const userId = req.user?.id;
   const { status } = req.query;
 
+  // Base query
   let sql = `
     SELECT 
       t.*, 
@@ -178,10 +179,11 @@ export const getAllTransaksi = (req, res) => {
   `;
   const values = [];
 
-
-  sql += " WHERE t.status = ?";
-  values.push(status);
-
+  // Jika query ?status= ada → filter
+  if (status) {
+    sql += " WHERE t.status = ?";
+    values.push(status);
+  }
 
   sql += " ORDER BY t.tanggal DESC";
 
@@ -196,17 +198,17 @@ export const getAllTransaksi = (req, res) => {
 };
 
 
+
 // 🔹 Ambil detail transaksi (admin/kasir)
 export const getTransaksiById = (req, res) => {
   const { id } = req.params;
-  const role = req.user?.role;
-  const userId = req.user?.id;
 
-  // Ambil data transaksi utama
   const sqlTransaksi = `
-    SELECT t.*, u.username AS kasir
+    SELECT 
+      t.*, 
+      u.username AS kasir
     FROM transactions t
-    JOIN users u ON t.kasir_id = u.id
+    LEFT JOIN users u ON t.kasir_id = u.id
     WHERE t.id = ?
   `;
 
@@ -218,19 +220,16 @@ export const getTransaksiById = (req, res) => {
 
     const transaksi = result[0];
 
-
-
     // Ambil detail item
     const sqlDetail = `
-  SELECT 
-    d.*, 
-    i.nama AS item_name, 
-    i.kategori AS item_kategori
-  FROM transaction_items d
-  JOIN items i ON d.item_id = i.id
-  WHERE d.transaction_id = ?
-`;
-
+      SELECT 
+        d.*, 
+        i.nama AS item_name, 
+        i.kategori AS item_kategori
+      FROM transaction_items d
+      JOIN items i ON d.item_id = i.id
+      WHERE d.transaction_id = ?
+    `;
 
     db.query(sqlDetail, [id], (err2, detail) => {
       if (err2)
@@ -244,6 +243,7 @@ export const getTransaksiById = (req, res) => {
     });
   });
 };
+
 
 // 🔹 Resume transaksi untuk dashboard (admin)
 export const getTransaksiResume = (req, res) => {
