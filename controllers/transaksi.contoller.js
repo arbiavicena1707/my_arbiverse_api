@@ -178,13 +178,10 @@ export const getAllTransaksi = (req, res) => {
   `;
   const values = [];
 
-  if (role === "kasir") {
-    sql += " WHERE t.status = ?";
-    values.push(status); // default pending
-  } else if (role === "admin" && status) {
-    sql += " WHERE t.status = ?";
-    values.push(status);
-  }
+
+  sql += " WHERE t.status = ?";
+  values.push(status);
+
 
   sql += " ORDER BY t.tanggal DESC";
 
