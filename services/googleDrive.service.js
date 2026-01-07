@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import path from "path";
+import { Readable } from "stream";
 
 // Path ke file JSON Service Account
 // User harus meletakkan file service account di folder root dan menamainya 'service-account.json'
@@ -97,7 +98,7 @@ export const uploadFile = async (file, parentId) => {
 
     const media = {
         mimeType: file.mimetype,
-        body: file.buffer, // Menggunakan buffer langsung agar Gaxios bisa me-retry jika gagal (Stream tidak bisa di-retry otomatis)
+        body: Readable.from(file.buffer), // GDrive multipart upload requires a stream
     };
 
     try {
