@@ -49,17 +49,18 @@ export const createFolder = async (folderName, parentId = null) => {
  * @param {string} parentId ID folder tempat file disimpan
  * @returns {Promise<Object>} Data file Drive
  */
-export const uploadFile = async (file, parentId = null) => {
-    const fileMetadata = {
-        name: file.originalname,
-        parents: [parentId]
-    };
-
-    if (parentId) {
-        fileMetadata.parents = [parentId];
+export const uploadFile = async (file, parentId) => {
+    // Pastikan parentId diisi dengan ID Folder yang sudah dishare tadi
+    if (!parentId) {
+        throw new Error("parentId (ID Folder) wajib diisi karena Service Account tidak punya ruang simpan sendiri.");
     }
 
-    // Auto-convert ke format Google Docs agar bisa diedit langsung di Iframe
+    const fileMetadata = {
+        name: file.originalname,
+        parents: [parentId], // File akan disimpan menggunakan kuota pemilik folder
+    };
+
+    // Logika auto-convert (tetap sama)
     const ext = path.extname(file.originalname).toLowerCase();
     if (ext === ".docx" || ext === ".doc") fileMetadata.mimeType = "application/vnd.google-apps.document";
     else if (ext === ".xlsx" || ext === ".xls") fileMetadata.mimeType = "application/vnd.google-apps.spreadsheet";
@@ -75,10 +76,10 @@ export const uploadFile = async (file, parentId = null) => {
             requestBody: fileMetadata,
             media: media,
             fields: "id, name, webViewLink, webContentLink",
-            supportsAllDrives: true,
+            supportsAllDrives: true, 
         });
 
-        // Set permission agar siapa saja yang punya link bisa mengedit (writer)
+        // Set izin agar file bisa diedit oleh siapa saja yang punya link
         await drive.permissions.create({
             fileId: response.data.id,
             requestBody: {
@@ -88,10 +89,10 @@ export const uploadFile = async (file, parentId = null) => {
             supportsAllDrives: true,
         });
 
-        console.log("Daftar folder yang bisa dilihat robot:", res.data.files);
         return response.data;
     } catch (error) {
-        console.error("Error uploading file to GDrive:", error);
+        // Hapus baris 'res.data.files' yang salah di kode sebelumnya
+        console.error("Error uploading file to GDrive:", error.message);
         throw error;
     }
 };
