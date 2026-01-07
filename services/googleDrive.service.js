@@ -25,7 +25,6 @@ export const createFolder = async (folderName, parentId = null) => {
     const fileMetadata = {
         name: folderName,
         mimeType: "application/vnd.google-apps.folder",
-        
     };
     if (parentId) {
         fileMetadata.parents = [parentId];
@@ -53,7 +52,7 @@ export const createFolder = async (folderName, parentId = null) => {
 export const uploadFile = async (file, parentId = null) => {
     const fileMetadata = {
         name: file.originalname,
-        parents: [finalParentId]
+        parents: [parentId]
     };
 
     if (parentId) {
