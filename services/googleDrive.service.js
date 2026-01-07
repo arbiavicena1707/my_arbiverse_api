@@ -27,19 +27,30 @@ const executeWithRetry = async (fn, maxRetries = 5) => {
             lastError = error;
             const status = error.response ? error.response.status : error.code;
 
+            // Extract useful debug info
+            const debugInfo = {
+                status,
+                url: error.response?.config?.url || 'unknown',
+                method: error.config?.method || 'unknown',
+                data: error.response?.data || 'no-data'
+            };
+
             // Retry on 429 (Rate Limit), 5xx (Server Error), and transient network errors
             const isRetryableNetworkError = !error.response &&
                 ["ECONNRESET", "ETIMEDOUT", "EAI_AGAIN", "ECONNREFUSED"].includes(error.code);
 
             if (status === 429 || (status >= 500 && status <= 599) || isRetryableNetworkError) {
                 const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
-                console.warn(`[GDrive] Attempt ${i + 1} failed with status/code ${status || error.code}. Retrying in ${Math.round(delay)}ms...`);
+                console.warn(`[GDrive] Attempt ${i + 1} failed. Details:`, JSON.stringify(debugInfo, null, 2));
+                console.warn(`[GDrive] Retrying in ${Math.round(delay)}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 continue;
             }
+            console.error(`[GDrive] Non-retryable error. Details:`, JSON.stringify(debugInfo, null, 2));
             throw error; // Re-throw if it's not a retryable error (e.g., 401, 403, 404)
         }
     }
+    console.error(`[GDrive] All retries failed. Last error:`, lastError.message);
     throw lastError;
 };
 
@@ -96,10 +107,14 @@ export const uploadFile = async (file, parentId) => {
     else if (ext === ".xlsx" || ext === ".xls") fileMetadata.mimeType = "application/vnd.google-apps.spreadsheet";
     else if (ext === ".pptx" || ext === ".ppt") fileMetadata.mimeType = "application/vnd.google-apps.presentation";
 
+    console.log(`[GDrive] Preparing upload. File: "${file.originalname}", Mime: "${file.mimetype}", ParentID: "${parentId}"`);
+
     const media = {
         mimeType: file.mimetype,
         body: Readable.from(file.buffer), // GDrive multipart upload requires a stream
     };
+
+    console.log(`[GDrive] Starting upload for file "${file.originalname}" to folder "${parentId}"`);
 
     try {
         const response = await executeWithRetry(() =>
