@@ -32,8 +32,9 @@ export const createFolder = async (folderName, parentId = null) => {
 
     try {
         const response = await drive.files.create({
-            resource: fileMetadata,
+            requestBody: fileMetadata,
             fields: "id",
+            supportsAllDrives: true,
         });
         return response.data.id;
     } catch (error) {
@@ -52,9 +53,16 @@ export const uploadFile = async (file, parentId = null) => {
     const fileMetadata = {
         name: file.originalname,
     };
+
     if (parentId) {
         fileMetadata.parents = [parentId];
     }
+
+    // Auto-convert ke format Google Docs agar bisa diedit langsung di Iframe
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === ".docx" || ext === ".doc") fileMetadata.mimeType = "application/vnd.google-apps.document";
+    else if (ext === ".xlsx" || ext === ".xls") fileMetadata.mimeType = "application/vnd.google-apps.spreadsheet";
+    else if (ext === ".pptx" || ext === ".ppt") fileMetadata.mimeType = "application/vnd.google-apps.presentation";
 
     const media = {
         mimeType: file.mimetype,
@@ -63,21 +71,20 @@ export const uploadFile = async (file, parentId = null) => {
 
     try {
         const response = await drive.files.create({
-            resource: fileMetadata,
+            requestBody: fileMetadata,
             media: media,
             fields: "id, name, webViewLink, webContentLink",
+            supportsAllDrives: true,
         });
 
-        // Beri izin publik (opsional, tergantung kebutuhan - user minta bisa diedit via iframe)
-        // Untuk edit via iframe Google Docs, file harus dibagikan atau didelegasikan.
-        // Di sini kita set sebagai 'reader' publik sebagai default, 
-        // tapi untuk 'writer' butuh akun spesifik atau domain.
+        // Set permission agar siapa saja yang punya link bisa mengedit (writer)
         await drive.permissions.create({
             fileId: response.data.id,
             requestBody: {
-                role: "reader",
+                role: "writer",
                 type: "anyone",
             },
+            supportsAllDrives: true,
         });
 
         return response.data;
