@@ -11,7 +11,13 @@ import { fileURLToPath } from "url";
 
 dotenv.config();
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: "*", // Mengizinkan semua domain (bisa diganti URL frontend spesifik nanti)
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 // ✅ Middleware parser universal
 app.use(express.json());
