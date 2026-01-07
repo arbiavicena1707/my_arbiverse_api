@@ -6,6 +6,7 @@ import path from "path";
 import projectRoutes from "./routes/project.router.js";
 import kasirRoutes from "./routes/kasir.router.js";
 import transaksiRoutes from "./routes/transaksi.router.js";
+import fileManagerRoutes from "./routes/fileManager.router.js";
 import { fileURLToPath } from "url";
 
 dotenv.config();
@@ -26,6 +27,7 @@ const __dirname = path.dirname(__filename);
 app.use("/api/list/project", projectRoutes);
 app.use("/api/kasir", kasirRoutes);
 app.use("/api/transaksi", transaksiRoutes);
+app.use("/api/file-manager", fileManagerRoutes);
 
 // ✅ Static folder
 app.use("/public", express.static(path.join(__dirname, "public")));

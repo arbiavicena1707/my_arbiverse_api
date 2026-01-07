@@ -171,7 +171,7 @@ export const getAllTransaksi = (req, res) => {
 
   // Base query
   let sql = `
-    SELECT 
+    SELECT
       t.*, 
       u.username AS kasir
     FROM transactions t
