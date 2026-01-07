@@ -87,6 +87,7 @@ export const uploadFile = async (file, parentId = null) => {
             supportsAllDrives: true,
         });
 
+        console.log("Daftar folder yang bisa dilihat robot:", res.data.files);
         return response.data;
     } catch (error) {
         console.error("Error uploading file to GDrive:", error);
